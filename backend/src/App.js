@@ -1,18 +1,43 @@
-import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
-
-dotenv.config();
+const express = require("express");
+const cors = require("cors");
+const errorMiddleware = require("./middleware/errorMiddleware");
 
 const app = express();
 
-// middleware
-app.use(cors());
-app.use(express.json());
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    credentials: true,
+  }),
+);
 
-// test route
-app.get("/", (req, res) => {
-  res.send("API is running 🚀");
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Health check
+app.get("/api/v1/health", (req, res) => {
+  const mongoose = require("mongoose");
+  const dbStatus =
+    mongoose.connection.readyState === 1 ? "connected" : "disconnected";
+  res.status(200).json({
+    success: true,
+    data: {
+      status: "Server is running",
+      database: dbStatus,
+      timestamp: new Date().toISOString(),
+    },
+  });
 });
 
-export default app;
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: { code: 404, message: `Route ${req.originalUrl} not found` },
+  });
+});
+
+// Global error handler — must be last
+app.use(errorMiddleware);
+
+module.exports = app;
